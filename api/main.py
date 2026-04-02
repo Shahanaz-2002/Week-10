@@ -11,11 +11,11 @@ from insight.confidence_engine import ConfidenceEngine
 from insight.explanation_generator import ExplanationGenerator
 from config import TOP_K
 
-# 🔹 Setup Logging (Fixed for Uvicorn)
+# 🔹 Setup Logging
 logging.basicConfig(
-    level=logging.INFO, 
+    level=logging.INFO,
     format="%(asctime)s - %(levelname)s - [%(name)s] - %(message)s",
-    force=True  # <--- THIS FORCES UVICORN TO RESPECT OUR RULES
+    force=True
 )
 logger = logging.getLogger(__name__)
 
@@ -41,12 +41,18 @@ explanation_generator = ExplanationGenerator()
 @app.post("/analyze-case", response_model=CaseResponse)
 def analyze_case(request: CaseRequest):
     start_time = time.time()
+
+    # 🔴 Input Validation (Day 1 requirement)
+    if not request.symptoms or len(request.symptoms) == 0:
+        raise HTTPException(status_code=400, detail="Symptoms are required")
+
     logger.info(f"Received new case analysis request. Symptoms count: {len(request.symptoms)}")
 
     try:
-        # 🔹 1. Format Input for Retrieval Contract
+        # 🔹 1. Format Input
         logger.info("Formatting input text for embedding generation...")
-        query_text = " ".join(request.symptoms) + " " + request.doctor_notes
+        doctor_notes = request.doctor_notes if request.doctor_notes else ""
+        query_text = " ".join(request.symptoms) + " " + doctor_notes
 
         # 🔹 2. Retrieve Similar Cases
         logger.info(f"Querying retrieval engine for top {TOP_K} matches...")
@@ -58,33 +64,38 @@ def analyze_case(request: CaseRequest):
 
         if not top_matches:
             logger.warning("No similar cases retrieved. Returning default response.")
+
+            response_time = round((time.time() - start_time) * 1000, 2)
+
             return CaseResponse(
+                status="success",
                 similar_cases=[],
+                predicted_diagnosis="No matching cases found",
+                suggested_treatment="Not available",
+                confidence_score=0.0,
+                confidence_level="Low",
+                clinical_explanation="No similar clinical patterns were found in the database.",
                 system_metrics=SystemMetrics(
-                    response_time_ms=round((time.time() - start_time) * 1000, 2),
+                    response_time_ms=response_time,
                     output_quality="Poor - No Matches"
                 )
             )
-        
+
         logger.info(f"Successfully retrieved {len(top_matches)} similar cases.")
 
         # 🔹 3. Generate Insights
         logger.info("Aggregating clinical insights from retrieved cases...")
         insight = insight_aggregator.aggregate_insights(top_matches)
-        logger.info(f"Aggregation complete. Predicted diagnosis: '{insight.get('diagnosis')}'")
-        
-        # 🔹 4. Compute Confidence
-        logger.info("Computing confidence score based on similarity metrics...")
-        confidence_data = confidence_engine.compute_confidence(top_matches)
-        logger.info(f"Confidence computed: {confidence_data.get('confidence_level')} ({confidence_data.get('confidence_score')})")
-        
-        # 🔹 5. Generate Explanation
-        logger.info("Generating clinical explanation narrative...")
-        explanation = explanation_generator.generate_explanation(insight, top_matches)
-        logger.info("Clinical explanation generated successfully.")
 
-        # 🔹 6. Format Output
-        logger.info("Formatting final API response...")
+        # 🔹 4. Compute Confidence
+        logger.info("Computing confidence score...")
+        confidence_data = confidence_engine.compute_confidence(top_matches)
+
+        # 🔹 5. Generate Explanation
+        logger.info("Generating clinical explanation...")
+        explanation = explanation_generator.generate_explanation(insight, top_matches)
+
+        # 🔹 6. Format Similar Cases
         similar_cases_formatted = [
             SimilarCase(
                 case_id=c["case_id"],
@@ -95,24 +106,35 @@ def analyze_case(request: CaseRequest):
         ]
 
         response_time = round((time.time() - start_time) * 1000, 2)
+
         logger.info(f"Request processed successfully in {response_time}ms")
 
+        # 🔹 7. Final Response (API Contract Standard)
         return CaseResponse(
+            status="success",
             similar_cases=similar_cases_formatted,
-            predicted_diagnosis=insight["diagnosis"],
-            suggested_treatment=insight["treatment"],
-            confidence_score=confidence_data["confidence_score"],
-            confidence_level=confidence_data["confidence_level"],
+            predicted_diagnosis=insight.get("diagnosis", "Unknown"),
+            suggested_treatment=insight.get("treatment", "Not specified"),
+            confidence_score=confidence_data.get("confidence_score", 0.0),
+            confidence_level=confidence_data.get("confidence_level", "Unknown"),
             clinical_explanation=explanation,
             system_metrics=SystemMetrics(
                 response_time_ms=response_time,
-                output_quality="High" if confidence_data["confidence_score"] > 0.7 else "Moderate"
+                output_quality="High" if confidence_data.get("confidence_score", 0) > 0.7 else "Moderate"
             )
         )
 
     except Exception as e:
         logger.error(f"Error during case analysis pipeline: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal Server Error processing case.")
+
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": "Internal Server Error processing case"
+            }
+        )
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
