@@ -1,19 +1,46 @@
 from typing import List, Dict
 import logging
+import json
+import time
 
 logger = logging.getLogger(__name__)
+
+
+
+#  LOG 
+
+def log_event(event_type, message, extra=None):
+    log_data = {
+        "event": event_type,
+        "message": message,
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+    }
+    if extra:
+        log_data.update(extra)
+
+    logger.info(json.dumps(log_data))
 
 
 class InsightAggregator:
 
     def aggregate_insights(self, top_matches: List[Dict]) -> Dict:
-        # 🔹 Input Validation
+
+        start_time = time.time()
+
+        log_event("insight_start", "Starting insight aggregation", {
+            "num_cases": len(top_matches) if isinstance(top_matches, list) else 0
+        })
+
+        
+        # INPUT VALIDATION
+        
         if not isinstance(top_matches, list):
-            logger.error("Invalid input: top_matches is not a list")
+            log_event("validation_error", "top_matches is not a list")
             raise ValueError("top_matches must be a list")
 
         if not top_matches:
-            logger.warning("No matches provided to aggregator")
+            log_event("no_matches", "No matches provided to aggregator")
+
             return {
                 "diagnosis": "Unknown condition",
                 "treatment": "No treatment pattern available"
@@ -21,11 +48,15 @@ class InsightAggregator:
 
         diagnosis_score = {}
         treatment_score = {}
+        processed_cases = 0
 
-        # 🔹 Process Each Case Safely
+        
+        # PROCESS EACH CASE
+        
         for case in top_matches:
+
             if not isinstance(case, dict):
-                logger.warning(f"Skipping invalid case (not dict): {case}")
+                log_event("invalid_case", "Skipping non-dict case")
                 continue
 
             try:
@@ -35,7 +66,9 @@ class InsightAggregator:
 
                 # Skip invalid similarity
                 if similarity < 0:
-                    logger.warning(f"Invalid similarity value: {similarity}")
+                    log_event("invalid_similarity", "Negative similarity skipped", {
+                        "value": similarity
+                    })
                     continue
 
                 # Aggregate diagnosis scores
@@ -52,11 +85,23 @@ class InsightAggregator:
                         treatment_score.get(treatment_clean, 0.0) + similarity
                     )
 
+                processed_cases += 1
+
             except Exception as e:
-                logger.warning(f"Skipping malformed case due to error: {e}")
+                log_event("case_processing_error", "Skipping malformed case", {
+                    "error": str(e)
+                })
                 continue
 
-        # 🔹 Final Prediction
+        log_event("aggregation_done", "Scores aggregated", {
+            "processed_cases": processed_cases,
+            "unique_diagnosis": len(diagnosis_score),
+            "unique_treatments": len(treatment_score)
+        })
+
+        
+        # FINAL PREDICTION
+        
         if diagnosis_score:
             predicted_diagnosis = max(diagnosis_score, key=diagnosis_score.get)
         else:
@@ -67,8 +112,16 @@ class InsightAggregator:
         else:
             predicted_treatment = "No treatment pattern found"
 
-        logger.info(f"Predicted Diagnosis: {predicted_diagnosis}")
-        logger.info(f"Predicted Treatment: {predicted_treatment}")
+        log_event("prediction_generated", "Final prediction created", {
+            "diagnosis": predicted_diagnosis,
+            "treatment": predicted_treatment
+        })
+
+        total_time = round((time.time() - start_time) * 1000, 2)
+
+        log_event("insight_completed", "Insight aggregation completed", {
+            "execution_time_ms": total_time
+        })
 
         return {
             "diagnosis": predicted_diagnosis,
