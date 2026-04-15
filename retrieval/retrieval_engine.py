@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 embedder = BioBERTEmbedding()
 
 
-# STRUCTURED LOG HELPER
+# 🔹 STRUCTURED LOG HELPER
 def log_event(event_type, message, extra=None):
     log_data = {
         "event": event_type,
@@ -23,6 +23,7 @@ def log_event(event_type, message, extra=None):
     logger.info(json.dumps(log_data))
 
 
+# 🔹 COSINE SIMILARITY
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     try:
         norm_a = np.linalg.norm(a)
@@ -31,15 +32,24 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
         if norm_a == 0 or norm_b == 0:
             return 0.0
 
-        return float(np.dot(a, b) / (norm_a * norm_b))
+        similarity = float(np.dot(a, b) / (norm_a * norm_b))
+
+        # ✅ Clamp to valid range
+        similarity = max(0.0, min(1.0, similarity))
+
+        return similarity
 
     except Exception as e:
         log_event("cosine_error", "Error in cosine similarity", {"error": str(e)})
         return 0.0
 
 
-def retrieve_similar_cases(query_text: str, case_database: List[Dict], top_k: int = 3) -> List[Dict]:
-
+# 🔹 MAIN RETRIEVAL FUNCTION
+def retrieve_similar_cases(
+    query_text: str,
+    case_database: List[Dict],
+    top_k: int = 3
+) -> List[Dict]:
 
     start_time = time.time()
 
@@ -49,9 +59,7 @@ def retrieve_similar_cases(query_text: str, case_database: List[Dict], top_k: in
         "top_k": top_k
     })
 
-    
-    # INPUT VALIDATION
-    
+    # 🔹 INPUT VALIDATION
     if not query_text or not isinstance(query_text, str) or not query_text.strip():
         log_event("validation_error", "Invalid query_text received")
         raise ValueError("Query text must be a non-empty string")
@@ -64,9 +72,7 @@ def retrieve_similar_cases(query_text: str, case_database: List[Dict], top_k: in
         log_event("top_k_warning", "Invalid top_k value, defaulting to 3")
         top_k = 3
 
-    
-    # EMBEDDING GENERATION
-    
+    # 🔹 EMBEDDING GENERATION
     try:
         embed_start = time.time()
 
@@ -77,6 +83,9 @@ def retrieve_similar_cases(query_text: str, case_database: List[Dict], top_k: in
             raise ValueError("Embedding generation failed")
 
         query_embedding = np.array(query_embedding)
+
+        # 🔍 DEBUG (optional)
+        # print("Query Embedding sample:", query_embedding[:5])
 
         embed_time = round((time.time() - embed_start) * 1000, 2)
 
@@ -92,9 +101,7 @@ def retrieve_similar_cases(query_text: str, case_database: List[Dict], top_k: in
     results = []
     processed_cases = 0
 
-    
-    # SIMILARITY COMPUTATION
-    
+    # 🔹 SIMILARITY COMPUTATION
     for case_data in case_database:
 
         if not isinstance(case_data, dict):
@@ -105,6 +112,7 @@ def retrieve_similar_cases(query_text: str, case_database: List[Dict], top_k: in
             case_embedding = np.array(case_data.get("embedding", []))
 
             if case_embedding.size == 0:
+                log_event("empty_embedding", "Skipping case with empty embedding")
                 continue
 
             similarity = cosine_similarity(query_embedding, case_embedding)
@@ -130,15 +138,12 @@ def retrieve_similar_cases(query_text: str, case_database: List[Dict], top_k: in
         "total_results": len(results)
     })
 
-   
-    # SORTING & TOP-K SELECTION
-    
+    # 🔹 SORTING & TOP-K
     try:
         results = sorted(results, key=lambda x: x["similarity"], reverse=True)
 
         top_results = results[:top_k]
 
-        # Log top-k summary (not full data to avoid heavy logs)
         log_event("top_k_selected", "Top K cases selected", {
             "top_k": top_k,
             "top_case_ids": [r["case_id"] for r in top_results],

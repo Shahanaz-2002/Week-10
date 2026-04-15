@@ -46,7 +46,7 @@ def analyze_case(request: CaseRequest):
     })
 
     try:
-        # 🔹 Call service layer (ALL LOGIC MOVED OUT)
+        # 🔹 Call service layer
         result = analyze_case_pipeline(request, request_id)
 
         response_time = round((time.time() - start_time) * 1000, 2)
@@ -55,7 +55,8 @@ def analyze_case(request: CaseRequest):
             "response_time_ms": response_time
         })
 
-        return result
+        
+        return CaseResponse(**result)
 
     except HTTPException:
         raise
@@ -65,11 +66,14 @@ def analyze_case(request: CaseRequest):
             "error": str(e)
         })
 
+        
         raise HTTPException(
             status_code=500,
             detail={
-                "status": "error",
-                "message": "Internal Server Error"
+                "suggested_resolution": "Error occurred while processing the request",
+                "similar_cases": [],
+                "confidence_score": 0.0,
+                "explanation": str(e)
             }
         )
 

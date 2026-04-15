@@ -6,7 +6,7 @@ import time
 logger = logging.getLogger(__name__)
 
 
-# LOG FUNCTION
+# 🔹 LOG FUNCTION
 def log_event(event_type, message, extra=None):
     log_data = {
         "event": event_type,
@@ -21,7 +21,12 @@ def log_event(event_type, message, extra=None):
 
 class InsightAggregator:
 
-    def aggregate_insights(self, top_matches: List[Dict], explanation: str, confidence_data: Dict) -> Dict:
+    def aggregate_insights(
+        self,
+        top_matches: List[Dict],
+        explanation: str,
+        confidence_data: Dict
+    ) -> Dict:
 
         start_time = time.time()
 
@@ -29,7 +34,7 @@ class InsightAggregator:
             "num_cases": len(top_matches) if isinstance(top_matches, list) else 0
         })
 
-        # INPUT VALIDATION
+        # 🔹 INPUT VALIDATION
         if not isinstance(top_matches, list):
             log_event("validation_error", "top_matches is not a list")
             raise ValueError("top_matches must be a list")
@@ -38,21 +43,16 @@ class InsightAggregator:
             log_event("no_matches", "No matches provided to aggregator")
 
             return {
-                "predicted_diagnosis": "Unknown condition",
-                "suggested_treatment": "No treatment pattern available",
+                "suggested_resolution": "No similar cases found. Unable to suggest a resolution.",
                 "confidence_score": confidence_data.get("confidence_score", 0.0),
-                "confidence_level": confidence_data.get("confidence_level", "Unknown"),
-                "clinical_explanation": explanation,
-                "metadata": {
-                    "retrieval_count": 0
-                }
+                "explanation": explanation or "No explanation available."
             }
 
         diagnosis_score = {}
         treatment_score = {}
         processed_cases = 0
 
-        # PROCESS EACH CASE
+        # 🔹 PROCESS EACH CASE
         for case in top_matches:
 
             if not isinstance(case, dict):
@@ -62,23 +62,22 @@ class InsightAggregator:
             try:
                 diagnosis = case.get("diagnosis")
                 treatment = case.get("treatment")
+
+                
                 similarity = float(case.get("similarity", 0.0))
 
-                # Skip invalid similarity
-                if similarity < 0:
-                    log_event("invalid_similarity", "Negative similarity skipped", {
-                        "value": similarity
-                    })
+                # 🔹 Skip invalid similarity
+                if similarity <= 0:
                     continue
 
-                # Aggregate diagnosis scores
+                # 🔹 Aggregate diagnosis
                 if diagnosis and isinstance(diagnosis, str) and diagnosis.strip():
                     diagnosis_clean = diagnosis.strip()
                     diagnosis_score[diagnosis_clean] = (
                         diagnosis_score.get(diagnosis_clean, 0.0) + similarity
                     )
 
-                # Aggregate treatment scores
+                # 🔹 Aggregate treatment
                 if treatment and isinstance(treatment, str) and treatment.strip():
                     treatment_clean = treatment.strip()
                     treatment_score[treatment_clean] = (
@@ -99,21 +98,27 @@ class InsightAggregator:
             "unique_treatments": len(treatment_score)
         })
 
-        # FINAL PREDICTION
-        if diagnosis_score:
-            predicted_diagnosis = max(diagnosis_score, key=diagnosis_score.get)
-        else:
-            predicted_diagnosis = "Unknown condition"
+        # 🔹 FINAL PREDICTION
+        predicted_diagnosis = (
+            max(diagnosis_score, key=diagnosis_score.get)
+            if diagnosis_score else "Unknown condition"
+        )
 
-        if treatment_score:
-            predicted_treatment = max(treatment_score, key=treatment_score.get)
-        else:
-            predicted_treatment = "No treatment pattern found"
+        predicted_treatment = (
+            max(treatment_score, key=treatment_score.get)
+            if treatment_score else "No treatment pattern found"
+        )
 
         log_event("prediction_generated", "Final prediction created", {
             "diagnosis": predicted_diagnosis,
             "treatment": predicted_treatment
         })
+
+        # 🔹 FINAL RESOLUTION STRING
+        suggested_resolution = (
+            f"Based on similar cases, the likely diagnosis is '{predicted_diagnosis}' "
+            f"and the recommended treatment is '{predicted_treatment}'."
+        )
 
         total_time = round((time.time() - start_time) * 1000, 2)
 
@@ -121,14 +126,9 @@ class InsightAggregator:
             "execution_time_ms": total_time
         })
 
-        # FINAL COMBINED RESPONSE (DAY 3 CORE)
+        # 🔹 FINAL RESPONSE
         return {
-            "predicted_diagnosis": predicted_diagnosis,
-            "suggested_treatment": predicted_treatment,
+            "suggested_resolution": suggested_resolution,
             "confidence_score": confidence_data.get("confidence_score", 0.0),
-            "confidence_level": confidence_data.get("confidence_level", "Unknown"),
-            "clinical_explanation": explanation,
-            "metadata": {
-                "retrieval_count": len(top_matches)
-            }
+            "explanation": explanation or "No explanation available."
         }

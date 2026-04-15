@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional, Literal
+from typing import List, Optional
 
 
 # 🔹 REQUEST MODEL
@@ -34,7 +34,6 @@ class CaseRequest(BaseModel):
     )
 
     # 🔹 Validators
-
     @field_validator("patient_id")
     @classmethod
     def validate_patient_id(cls, v):
@@ -82,49 +81,26 @@ class SimilarCase(BaseModel):
     treatment: str = Field(..., min_length=1)
 
 
-# 🔹 SYSTEM METRICS MODEL
-class SystemMetrics(BaseModel):
-    response_time_ms: float = Field(
-        ...,
-        ge=0,
-        description="API response time in milliseconds"
-    )
-
-    output_quality: Literal["High", "Moderate", "Poor - No Matches"] = Field(
-        ...,
-        description="Quality of output"
-    )
-
-
-# 🔹 FINAL RESPONSE MODEL
+# 🔹 FINAL STANDARDIZED RESPONSE MODEL (Day 4)
 class CaseResponse(BaseModel):
-    status: Literal["success", "error"] = Field(
+    suggested_resolution: str = Field(
         ...,
-        description="API response status"
+        description="Final suggested resolution based on similar cases"
     )
 
-    similar_cases: List[SimilarCase] = Field(default_factory=list)
-
-    predicted_diagnosis: str = Field(
-        default="Unknown"
-    )
-
-    suggested_treatment: str = Field(
-        default="No treatment available"
+    similar_cases: List[SimilarCase] = Field(
+        default_factory=list,
+        description="List of retrieved similar cases"
     )
 
     confidence_score: float = Field(
-        default=0.0,
+        ...,
         ge=0.0,
-        le=1.0
+        le=1.0,
+        description="Confidence score between 0 and 1"
     )
 
-    confidence_level: Literal["Low", "Moderate", "High"] = Field(
-        default="Low"
+    explanation: str = Field(
+        ...,
+        description="Explanation of how the result was derived"
     )
-
-    clinical_explanation: str = Field(
-        default="No explanation available"
-    )
-
-    system_metrics: SystemMetrics

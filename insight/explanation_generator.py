@@ -1,22 +1,51 @@
 class ExplanationGenerator:
 
-    def generate_explanation(self, insight: dict, retrieved_cases: list) -> str:
+    def generate_explanation(self, retrieved_cases: list) -> str:
+
+        # 🔹 No cases found
         if not retrieved_cases:
-            return "Insufficient historical data. Clinical recommendation should be made utilizing standard diagnostic protocols."
+            return (
+                "No similar cases were found in the database. "
+                "The recommendation is based on limited available information."
+            )
 
-        diagnosis = insight.get("diagnosis", "an unspecified condition")
-        treatment = insight.get("treatment", "standard care")
         case_count = len(retrieved_cases)
-        
-        similarities = [float(case.get("similarity", 0)) for case in retrieved_cases]
-        avg_similarity = (sum(similarities) / len(similarities)) * 100
 
+        # 🔹 Extract similarity values 
+        similarities = []
+
+        for case in retrieved_cases:
+            try:
+                sim = float(case.get("similarity", 0.0))  
+                similarities.append(sim)
+            except Exception:
+                continue
+
+        # 🔹 Safety check
+        if not similarities:
+            avg_similarity = 0.0
+        else:
+            avg_similarity = (sum(similarities) / len(similarities)) * 100
+
+        # 🔹 Use top case
+        top_case = retrieved_cases[0]
+
+        diagnosis = top_case.get("diagnosis", "an unspecified condition")
+        treatment = top_case.get("treatment", "standard care")
+
+        try:
+            top_score = float(top_case.get("similarity", 0.0)) * 100  
+        except Exception:
+            top_score = 0.0
+
+        # 🔹 Build explanation
         explanation = (
-            f"Analysis identified {case_count} highly analogous historical cases "
-            f"(Average semantic match: {avg_similarity:.1f}%). "
-            f"Within this cohort, the predominant clinical diagnosis was '{diagnosis}'. "
-            f"Historical patient records indicate positive therapeutic response to '{treatment}'. "
-            f"This precedent suggests '{treatment}' as a highly viable intervention pathway for the current presentation."
+            f"{case_count} similar cases were retrieved from historical data. "
+            f"The most relevant case has a similarity score of {top_score:.1f}%, "
+            f"with diagnosis '{diagnosis}'. "
+            f"On average, retrieved cases show {avg_similarity:.1f}% similarity. "
+            f"These cases commonly responded well to the treatment '{treatment}', "
+            f"which supports the suggested resolution."
         )
 
         return explanation
