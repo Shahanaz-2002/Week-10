@@ -6,10 +6,10 @@ from fastapi import FastAPI, HTTPException
 import uvicorn
 
 from models.models import CaseRequest, CaseResponse
-from services.analyze_service import analyze_case_pipeline  
+from services.analyze_service import analyze_case_pipeline
 
 
-# LOGGING
+# LOGGING CONFIG
 logging.basicConfig(
     level=logging.INFO,
     format="%(message)s",
@@ -27,22 +27,26 @@ def log_event(event_type, request_id, message, extra=None):
     }
     if extra:
         log_data.update(extra)
+
     logger.info(json.dumps(log_data))
 
 
-app = FastAPI(title="Clinical Insight Engine API", version="1.0")
+# FASTAPI APP
+app = FastAPI(
+    title="Case Insight Engine API",
+    version="1.0"
+)
 
 
-@app.post("/analyze-case", response_model=CaseResponse)
+@app.post("/ai/analyze-case", response_model=CaseResponse)
 def analyze_case(request: CaseRequest):
 
     request_id = str(uuid.uuid4())
     start_time = time.time()
 
+    
     log_event("request_received", request_id, "Incoming request", {
-        "symptom_count": len(request.symptoms) if request.symptoms else 0,
-        "age": request.age,
-        "gender": request.gender
+        "input_length": len(request.case_description)
     })
 
     try:
@@ -55,7 +59,6 @@ def analyze_case(request: CaseRequest):
             "response_time_ms": response_time
         })
 
-        
         return CaseResponse(**result)
 
     except HTTPException:
@@ -66,7 +69,6 @@ def analyze_case(request: CaseRequest):
             "error": str(e)
         })
 
-        
         raise HTTPException(
             status_code=500,
             detail={
