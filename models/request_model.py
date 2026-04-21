@@ -1,61 +1,46 @@
 from pydantic import BaseModel, Field, validator
-from typing import List, Optional, Literal
+from typing import Optional
 
 
 class CaseRequest(BaseModel):
-    patient_id: str = Field(
+    customer_id: str = Field(
         ...,
         min_length=1,
-        description="Unique patient identifier"
+        description="Unique customer identifier"
     )
 
-    symptoms: List[str] = Field(
+    case_description: str = Field(
         ...,
-        min_items=1,
-        description="List of patient symptoms"
+        min_length=5,
+        description="Detailed description of the customer's issue or complaint"
     )
 
-    doctor_notes: Optional[str] = Field(
+    location: Optional[str] = Field(
         None,
-        description="Clinical notes from the doctor"
+        description="Location associated with the complaint"
     )
 
-    age: int = Field(
-        ...,
-        ge=0,
-        le=120,
-        description="Patient age"
+    category: Optional[str] = Field(
+        None,
+        description="Optional pre-assigned category of the complaint"
     )
 
+    # VALIDATORS
 
-    gender: Literal["male", "female", "other"] = Field(
-        ...,
-        description="Patient gender"
-    )
-
-    # 🔹 VALIDATORS
-
-    @validator("patient_id")
-    def validate_patient_id(cls, v):
+    @validator("customer_id")
+    def validate_customer_id(cls, v):
         if not v or not v.strip():
-            raise ValueError("patient_id cannot be empty")
+            raise ValueError("customer_id cannot be empty")
         return v.strip()
 
-    @validator("symptoms")
-    def validate_symptoms(cls, v):
-        if not v or len(v) == 0:
-            raise ValueError("Symptoms must not be empty")
+    @validator("case_description")
+    def validate_case_description(cls, v):
+        if not v or not v.strip():
+            raise ValueError("case_description cannot be empty")
+        return v.strip()
 
-        cleaned = []
-        for s in v:
-            if not s or not s.strip():
-                raise ValueError("Symptoms list contains empty values")
-            cleaned.append(s.strip())
-
-        return cleaned
-
-    @validator("doctor_notes", always=True)
-    def validate_doctor_notes(cls, v):
+    @validator("location", "category", always=True)
+    def validate_optional_strings(cls, v):
         if v is None:
             return ""
         return v.strip()

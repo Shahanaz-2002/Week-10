@@ -10,7 +10,13 @@ def generate_and_store_embeddings():
 
     for record in records:
         case_id = record["case_id"]
-        text = " ".join(record.get("symptoms", [])) + " " + record.get("doctor_notes", "")
+        
+        # Updated to use the CCMS case description instead of medical fields
+        text = str(record.get("case_description", "")).strip()
+        
+        # Note: If you want the category or location to influence the similarity, 
+        # you could append them here, e.g.: text = f"{text} {record.get('category', '')}"
+
         embedding = embedder.get_embedding(text)
 
         collection.update_one(

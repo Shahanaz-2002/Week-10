@@ -48,8 +48,8 @@ class InsightAggregator:
                 "explanation": explanation or "No explanation available."
             }
 
-        diagnosis_score = {}
-        treatment_score = {}
+        category_score = {}
+        resolution_score = {}
         processed_cases = 0
 
         # 🔹 PROCESS EACH CASE
@@ -60,28 +60,27 @@ class InsightAggregator:
                 continue
 
             try:
-                diagnosis = case.get("diagnosis")
-                treatment = case.get("treatment")
+                category = case.get("category")
+                resolution = case.get("resolution_notes")
 
-                
                 similarity = float(case.get("similarity", 0.0))
 
                 # 🔹 Skip invalid similarity
                 if similarity <= 0:
                     continue
 
-                # 🔹 Aggregate diagnosis
-                if diagnosis and isinstance(diagnosis, str) and diagnosis.strip():
-                    diagnosis_clean = diagnosis.strip()
-                    diagnosis_score[diagnosis_clean] = (
-                        diagnosis_score.get(diagnosis_clean, 0.0) + similarity
+                # 🔹 Aggregate category
+                if category and isinstance(category, str) and category.strip():
+                    category_clean = category.strip()
+                    category_score[category_clean] = (
+                        category_score.get(category_clean, 0.0) + similarity
                     )
 
-                # 🔹 Aggregate treatment
-                if treatment and isinstance(treatment, str) and treatment.strip():
-                    treatment_clean = treatment.strip()
-                    treatment_score[treatment_clean] = (
-                        treatment_score.get(treatment_clean, 0.0) + similarity
+                # 🔹 Aggregate resolution notes
+                if resolution and isinstance(resolution, str) and resolution.strip():
+                    resolution_clean = resolution.strip()
+                    resolution_score[resolution_clean] = (
+                        resolution_score.get(resolution_clean, 0.0) + similarity
                     )
 
                 processed_cases += 1
@@ -94,30 +93,30 @@ class InsightAggregator:
 
         log_event("aggregation_done", "Scores aggregated", {
             "processed_cases": processed_cases,
-            "unique_diagnosis": len(diagnosis_score),
-            "unique_treatments": len(treatment_score)
+            "unique_categories": len(category_score),
+            "unique_resolutions": len(resolution_score)
         })
 
         # 🔹 FINAL PREDICTION
-        predicted_diagnosis = (
-            max(diagnosis_score, key=diagnosis_score.get)
-            if diagnosis_score else "Unknown condition"
+        predicted_category = (
+            max(category_score, key=category_score.get)
+            if category_score else "Unknown category"
         )
 
-        predicted_treatment = (
-            max(treatment_score, key=treatment_score.get)
-            if treatment_score else "No treatment pattern found"
+        predicted_resolution = (
+            max(resolution_score, key=resolution_score.get)
+            if resolution_score else "No resolution pattern found"
         )
 
         log_event("prediction_generated", "Final prediction created", {
-            "diagnosis": predicted_diagnosis,
-            "treatment": predicted_treatment
+            "category": predicted_category,
+            "resolution": predicted_resolution
         })
 
         # 🔹 FINAL RESOLUTION STRING
         suggested_resolution = (
-            f"Based on similar cases, the likely diagnosis is '{predicted_diagnosis}' "
-            f"and the recommended treatment is '{predicted_treatment}'."
+            f"Based on similar cases, the likely category is '{predicted_category}' "
+            f"and the recommended resolution is '{predicted_resolution}'."
         )
 
         total_time = round((time.time() - start_time) * 1000, 2)

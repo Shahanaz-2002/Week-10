@@ -1,10 +1,10 @@
-# API Contract – Clinical Insight Engine
+# API Contract – CCMS Insight Engine
 
 ---
 
 ## Overview
 
-This document defines the API contract for the **Clinical Insight Engine**, which provides AI-driven analysis of patient cases.
+This document defines the API contract for the **CCMS Insight Engine**, which provides AI-driven analysis of customer complaints.
 
 It specifies:
 - API endpoint details
@@ -28,19 +28,18 @@ This contract ensures seamless integration with the **CCMS Spring Boot backend**
 
 ### Description
 
-The API accepts patient clinical data including symptoms and optional doctor notes.
+The API accepts customer complaint data, primarily driven by a detailed case description, to find similar historical resolutions.
 
 ---
 
 ### Fields
 
-| Field Name   | Type        | Required | Description |
-|-------------|--------------|----------|-------------|
-| patient_id  | string       |  Yes   | Unique patient identifier |
-| symptoms    | list[string] |  Yes   | List of patient symptoms |
-| doctor_notes| string       |  No    | Additional clinical notes |
-| age         | integer      |  Yes   | Patient age |
-| gender      | string       |  Yes   | Patient gender |
+| Field Name       | Type    | Required | Description                                   |
+|------------------|---------|----------|-----------------------------------------------|
+| customer_id      | string  | Yes      | Unique customer identifier                    |
+| case_description | string  | Yes      | Detailed description of the issue or complaint|
+| location         | string  | No       | Location associated with the complaint        |
+| category         | string  | No       | Optional pre-assigned category                |
 
 ---
 
@@ -48,9 +47,8 @@ The API accepts patient clinical data including symptoms and optional doctor not
 
 ```json
 {
-  "patient_id": "P001",
-  "symptoms": ["chest pain", "fatigue"],
-  "doctor_notes": "Irregular heartbeat observed",
-  "age": 54,
-  "gender": "male"
+  "customer_id": "CUST-8992",
+  "case_description": "The login portal crashes every time I try to reset my password.",
+  "location": "New York",
+  "category": "Technical Issue"
 }

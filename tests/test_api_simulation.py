@@ -3,7 +3,7 @@ import json
 import time
 import uuid
 
-API_URL = "http://127.0.0.1:8000/analyze-case"
+API_URL = "http://127.0.0.1:8000/ai/analyze-case" # Adjusted to match main.py route if applicable, or leave as /analyze-case
 
 
 # =========================
@@ -14,26 +14,24 @@ def print_divider():
     print("=" * 60)
 
 
-def generate_patient_id():
-    return f"P-{uuid.uuid4().hex[:6]}"
+def generate_customer_id():
+    return f"CUST-{uuid.uuid4().hex[:6].upper()}"
 
 
-def add_patient_id(payload):
-    payload["patient_id"] = generate_patient_id()
+def add_customer_id(payload):
+    # Only auto-generate if the test isn't intentionally leaving it blank
+    if "customer_id" not in payload:
+        payload["customer_id"] = generate_customer_id()
     return payload
 
 
 # 🔹 SUCCESS RESPONSE VALIDATION
 def validate_success_response(data):
     required_fields = [
-        "status",
+        "suggested_resolution",
         "similar_cases",
-        "predicted_diagnosis",
-        "suggested_treatment",
         "confidence_score",
-        "confidence_level",
-        "clinical_explanation",
-        "system_metrics"
+        "explanation"
     ]
 
     # Check fields exist
@@ -42,20 +40,14 @@ def validate_success_response(data):
             return False, f"Missing field: {field}"
 
     # Type checks
-    if data["status"] != "success":
-        return False, "Status is not 'success'"
-
     if not isinstance(data["similar_cases"], list):
         return False, "similar_cases should be a list"
 
     if not (0.0 <= data["confidence_score"] <= 1.0):
         return False, "confidence_score out of range"
 
-    if data["confidence_level"] not in ["Low", "Moderate", "High"]:
-        return False, "Invalid confidence_level"
-
-    if "response_time_ms" not in data["system_metrics"]:
-        return False, "Missing system_metrics.response_time_ms"
+    if not isinstance(data["suggested_resolution"], str):
+        return False, "suggested_resolution should be a string"
 
     return True, "Valid response structure"
 
@@ -71,7 +63,7 @@ def send_request(payload, test_name, expected_status):
     print_divider()
     print(f"TEST: {test_name}")
 
-    payload = add_patient_id(payload)
+    payload = add_customer_id(payload)
 
     start_time = time.time()
 
@@ -125,94 +117,63 @@ test_cases = [
 
     # VALID CASE
     {
-        "name": "Valid Case",
+        "name": "Valid CCMS Case",
         "payload": {
-            "symptoms": ["fever", "cough"],
-            "age": 40,
-            "gender": "male",
-            "doctor_notes": "persistent for 2 days"
+            "case_description": "The login portal crashes every time I try to reset my password.",
+            "location": "New York",
+            "category": "Technical Issue"
         },
         "expected_status": 200
     },
 
-    # EMPTY SYMPTOMS
+    # EMPTY CASE DESCRIPTION
     {
-        "name": "Empty Symptoms",
+        "name": "Empty Case Description",
         "payload": {
-            "symptoms": [],
-            "age": 30,
-            "gender": "female",
-            "doctor_notes": ""
+            "case_description": "   ",
+            "location": "Chicago",
+            "category": "Billing"
         },
         "expected_status": 422
     },
 
-    # INVALID AGE
+    # MISSING DESCRIPTION FIELD
     {
-        "name": "Invalid Age",
+        "name": "Missing Description Field",
         "payload": {
-            "symptoms": ["headache"],
-            "age": -5,
-            "gender": "male",
-            "doctor_notes": ""
+            "location": "Dallas",
+            "category": "General Inquiry"
         },
         "expected_status": 422
     },
 
-    # INVALID GENDER
+    # MISSING CUSTOMER ID
     {
-        "name": "Invalid Gender",
+        "name": "Missing Customer ID",
         "payload": {
-            "symptoms": ["fatigue"],
-            "age": 25,
-            "gender": "unknown",
-            "doctor_notes": ""
-        },
-        "expected_status": 422
-    },
-
-    # EMPTY STRINGS IN SYMPTOMS
-    {
-        "name": "Empty Symptom Values",
-        "payload": {
-            "symptoms": ["fever", ""],
-            "age": 35,
-            "gender": "female",
-            "doctor_notes": ""
-        },
-        "expected_status": 422
-    },
-
-    # MISSING FIELD
-    {
-        "name": "Missing Symptoms Field",
-        "payload": {
-            "age": 50,
-            "gender": "male"
+            "customer_id": "",
+            "case_description": "My delivery was late by 3 days.",
+            "location": "Seattle"
         },
         "expected_status": 422
     },
 
     # LONG INPUT
     {
-        "name": "Long Doctor Notes",
+        "name": "Long Case Description",
         "payload": {
-            "symptoms": ["fever"],
-            "age": 45,
-            "gender": "male",
-            "doctor_notes": "very long text " * 100
+            "case_description": "I have been trying to reach support for hours. " * 50,
+            "location": "Boston",
+            "category": "Customer Support"
         },
         "expected_status": 200
     },
 
-    # SINGLE SYMPTOM
+    # MINIMAL VALID INPUT (Only required fields)
     {
-        "name": "Single Symptom",
+        "name": "Minimal Valid Input",
         "payload": {
-            "symptoms": ["cough"],
-            "age": 28,
-            "gender": "female",
-            "doctor_notes": ""
+            "case_description": "Refund not processed."
         },
         "expected_status": 200
     }

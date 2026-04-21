@@ -2,8 +2,8 @@
 
 # MongoDB Configuration
 MONGO_URI = "mongodb://localhost:27017"
-DATABASE_NAME = "ccms_training"
-COLLECTION_NAME = "clinic_cases"
+DATABASE_NAME = "ccms_ai"
+COLLECTION_NAME = "dermatology_cases"
 
 # Retrieval Configuration
 TOP_K = 3

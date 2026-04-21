@@ -17,17 +17,13 @@ def fetch_case_database() -> list:
             if not case_id or embedding is None or not isinstance(embedding, list):
                 continue
 
-            symptoms = record.get("symptoms", [])
-            if isinstance(symptoms, str):
-                symptoms = [s.strip() for s in symptoms.split(",") if s.strip()]
-
             case_data = {
                 "case_id": str(case_id),
                 "embedding": embedding,
-                "symptoms": symptoms,
-                "diagnosis": record.get("diagnosis"),
-                "treatment": record.get("treatment"),
-                "doctor_notes": record.get("doctor_notes", "")
+                "case_description": record.get("case_description", ""),
+                "category": record.get("category"),
+                "location": record.get("location"),
+                "resolution_notes": record.get("resolution_notes", "")
             }
             case_database.append(case_data)
 

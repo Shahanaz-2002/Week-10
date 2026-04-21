@@ -1,8 +1,6 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import List
 
-
-
 class CaseRequest(BaseModel):
     case_description: str = Field(
         ...,
@@ -10,7 +8,7 @@ class CaseRequest(BaseModel):
         description="Detailed description of the case"
     )
 
-    # 🔹 Validator
+    # Validator
     @field_validator("case_description")
     @classmethod
     def validate_case_description(cls, v):
@@ -19,8 +17,7 @@ class CaseRequest(BaseModel):
             raise ValueError("case_description cannot be empty")
         return v
 
-
-# 🔹 SIMILAR CASE MODEL 
+# SIMILAR CASE MODEL 
 class SimilarCase(BaseModel):
     case_id: str = Field(..., min_length=1)
 
@@ -31,11 +28,11 @@ class SimilarCase(BaseModel):
         description="Similarity score between 0 and 1"
     )
 
-    diagnosis: str = Field(..., min_length=1)
-    treatment: str = Field(..., min_length=1)
+    category: str = Field(..., min_length=1, description="Category of the similar case")
+    location: str = Field(..., description="Location associated with the case")
+    resolution_notes: str = Field(..., min_length=1, description="How the case was resolved")
 
-
-# 🔹 FINAL STANDARDIZED RESPONSE MODEL 
+# FINAL STANDARDIZED RESPONSE MODEL 
 class CaseResponse(BaseModel):
     suggested_resolution: str = Field(
         ...,

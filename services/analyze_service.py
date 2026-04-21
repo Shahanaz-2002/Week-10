@@ -10,7 +10,7 @@ from insight.explanation_generator import ExplanationGenerator
 from config import TOP_K
 
 
-# 🔹 Initialize once
+# Initialize once
 case_database = fetch_case_database()
 
 insight_aggregator = InsightAggregator()
@@ -22,7 +22,7 @@ def analyze_case_pipeline(request, request_id, log_event=None):
     start_time = time.time()
 
     try:
-        # 🔹 INPUT FORMATTING 
+        # INPUT FORMATTING 
         query_text = request.case_description.strip()
 
         if not query_text:
@@ -31,7 +31,7 @@ def analyze_case_pipeline(request, request_id, log_event=None):
         if log_event:
             log_event("input_processed", request_id, "Input formatted successfully")
 
-        # 🔹 RETRIEVAL
+        # RETRIEVAL
         top_matches = retrieve_similar_cases(
             query_text=query_text,
             case_database=case_database,
@@ -43,7 +43,7 @@ def analyze_case_pipeline(request, request_id, log_event=None):
                 "num_cases": len(top_matches) if top_matches else 0
             })
 
-        # 🔹 FORMAT SIMILAR CASES
+        # FORMAT SIMILAR CASES
         similar_cases_formatted = []
 
         for c in top_matches:
@@ -52,14 +52,15 @@ def analyze_case_pipeline(request, request_id, log_event=None):
                     SimilarCase(
                         case_id=c.get("case_id", "Unknown"),
                         similarity_score=float(c.get("similarity", 0.0)),
-                        diagnosis=c.get("diagnosis", "Unknown"),
-                        treatment=c.get("treatment", "Unknown")
+                        category=c.get("category", "Unknown"),
+                        location=c.get("location", "Unknown"),
+                        resolution_notes=c.get("resolution_notes", "Unknown")
                     )
                 )
             except Exception:
                 continue
 
-        # 🔹 NO MATCH CASE
+        # NO MATCH CASE
         if not similar_cases_formatted:
             return {
                 "suggested_resolution": "No similar cases found. Unable to provide a recommendation.",
@@ -68,20 +69,20 @@ def analyze_case_pipeline(request, request_id, log_event=None):
                 "explanation": "No similar patterns were found in the database."
             }
 
-        # 🔹 CONFIDENCE
+        # CONFIDENCE
         confidence_data = confidence_engine.compute_confidence(top_matches)
 
-        # 🔹 EXPLANATION
+        # EXPLANATION
         explanation = explanation_generator.generate_explanation(top_matches)
 
-        # 🔹 FINAL INSIGHT
+        # FINAL INSIGHT
         final_insight = insight_aggregator.aggregate_insights(
             top_matches=top_matches,
             explanation=explanation,
             confidence_data=confidence_data
         )
 
-        # 🔹 FINAL RESPONSE
+        # FINAL RESPONSE
         return {
             "suggested_resolution": final_insight.get("suggested_resolution"),
             "similar_cases": similar_cases_formatted,
