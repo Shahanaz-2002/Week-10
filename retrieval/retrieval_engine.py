@@ -34,9 +34,7 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 
         similarity = float(np.dot(a, b) / (norm_a * norm_b))
 
-        # ✅ Clamp to valid range
-        similarity = max(0.0, min(1.0, similarity))
-
+        #  DO NOT CLAMP — keep true cosine similarity (-1 to 1)
         return similarity
 
     except Exception as e:
@@ -84,9 +82,6 @@ def retrieve_similar_cases(
 
         query_embedding = np.array(query_embedding)
 
-        # 🔍 DEBUG (optional)
-        # print("Query Embedding sample:", query_embedding[:5])
-
         embed_time = round((time.time() - embed_start) * 1000, 2)
 
         log_event("embedding_generated", "Query embedding created", {
@@ -115,6 +110,14 @@ def retrieve_similar_cases(
                 log_event("empty_embedding", "Skipping case with empty embedding")
                 continue
 
+            #  Dimension check (VERY IMPORTANT)
+            if len(query_embedding) != len(case_embedding):
+                log_event("dimension_mismatch", "Embedding dimension mismatch", {
+                    "query_dim": len(query_embedding),
+                    "case_dim": len(case_embedding)
+                })
+                continue
+
             similarity = cosine_similarity(query_embedding, case_embedding)
 
             results.append({
@@ -122,7 +125,8 @@ def retrieve_similar_cases(
                 "similarity": similarity,
                 "diagnosis": case_data.get("diagnosis", "Unknown"),
                 "treatment": case_data.get("treatment", "Unknown"),
-                "symptoms": case_data.get("symptoms", [])
+                "symptoms": case_data.get("symptoms", []),
+                "case_description": case_data.get("case_description", "")
             })
 
             processed_cases += 1
@@ -149,6 +153,15 @@ def retrieve_similar_cases(
             "top_case_ids": [r["case_id"] for r in top_results],
             "top_scores": [round(r["similarity"], 4) for r in top_results]
         })
+
+        #  DEBUG OUTPUT (REQUIRED FOR DAY 2 VALIDATION)
+        print("\n🔍 Query:", query_text)
+        print("Top Results:")
+        for r in top_results:
+            print(f"Case ID: {r['case_id']}")
+            print(f"Similarity: {round(r['similarity'], 4)}")
+            print(f"Description: {r['case_description']}")
+            print("-" * 50)
 
     except Exception as e:
         log_event("sorting_error", "Error during sorting", {"error": str(e)})
