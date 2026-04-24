@@ -39,8 +39,9 @@ class ExplanationGenerator:
                 log_event("no_cases", "No retrieved cases for explanation")
 
                 return (
-                    "No similar cases were found in the database. "
-                    "The recommendation is based on limited available information."
+                    "No similar cases were found.\n"
+                    "Reason: Insufficient historical data.\n"
+                    "Recommendation: Proceed with manual review."
                 )
 
             case_count = len(retrieved_cases)
@@ -58,30 +59,30 @@ class ExplanationGenerator:
                     continue
 
             # ---------------- AVERAGE SIMILARITY ----------------
-            if not similarities:
-                avg_similarity = 0.0
-            else:
-                avg_similarity = (sum(similarities) / len(similarities)) * 100
+            avg_similarity = (sum(similarities) / len(similarities)) * 100 if similarities else 0.0
 
             # ---------------- TOP CASE ----------------
-            top_case = retrieved_cases[0] if retrieved_cases else {}
+            top_case = retrieved_cases[0]
 
-            category = top_case.get("category", "an unspecified category")
-            resolution = top_case.get("resolution_notes", "standard resolution procedures")
+            category = top_case.get("category", "Unknown")
+            resolution = top_case.get("resolution_notes", "No standard resolution available")
 
             try:
                 top_score = float(top_case.get("similarity", 0.0)) * 100
             except Exception:
                 top_score = 0.0
 
-            # ---------------- BUILD EXPLANATION ----------------
+            # ---------------- STRUCTURED EXPLANATION ----------------
             explanation = (
-                f"{case_count} similar cases were retrieved from historical data. "
-                f"The most relevant case has a similarity score of {top_score:.1f}%, "
-                f"falling under category '{category}'. "
-                f"On average, retrieved cases show {avg_similarity:.1f}% similarity. "
-                f"These cases were commonly resolved by '{resolution}', "
-                f"which supports the suggested resolution."
+                f"Summary of Analysis:\n"
+                f"- Retrieved {case_count} similar case(s) from historical data.\n"
+                f"- Top match similarity: {top_score:.1f}%\n"
+                f"- Average similarity: {avg_similarity:.1f}%\n\n"
+                f"Key Insight:\n"
+                f"- Most relevant category: {category}\n"
+                f"- Common resolution approach: {resolution}\n\n"
+                f"Conclusion:\n"
+                f"- The recommendation is based on consistent patterns observed in similar past cases."
             )
 
             total_time = round((time.time() - start_time) * 1000, 2)

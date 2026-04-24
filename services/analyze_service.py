@@ -15,7 +15,7 @@ try:
     case_database = fetch_case_database()
 except Exception:
     case_database = []
-    
+
 insight_aggregator = InsightAggregator()
 confidence_engine = ConfidenceEngine()
 explanation_generator = ExplanationGenerator()
@@ -27,7 +27,7 @@ def analyze_case_pipeline(request, request_id, log_event=None):
 
     try:
         # ---------------- INPUT FORMATTING ----------------
-        query_text = request.case_description.strip()
+        query_text = (request.case_description or "").strip()
 
         if not query_text:
             raise HTTPException(
@@ -55,15 +55,23 @@ def analyze_case_pipeline(request, request_id, log_event=None):
                 detail="Error during similarity retrieval"
             )
 
+        # ---------------- NO MATCH CASE ----------------
         if not top_matches:
             if log_event:
                 log_event("no_matches", request_id, "No similar cases found")
 
             return {
-                "suggested_resolution": "No similar cases found. Unable to provide a recommendation.",
+                "suggested_resolution": (
+                    "No similar cases were found.\n"
+                    "Recommended Action: Escalate for manual review."
+                ),
                 "similar_cases": [],
                 "confidence_score": 0.0,
-                "explanation": "No similar patterns were found in the database."
+                "explanation": (
+                    "No similar cases were found.\n"
+                    "Reason: Insufficient historical data.\n"
+                    "Recommendation: Proceed with manual analysis."
+                )
             }
 
         if log_event:
@@ -78,22 +86,26 @@ def analyze_case_pipeline(request, request_id, log_event=None):
             try:
                 similar_cases_formatted.append(
                     SimilarCase(
-                        case_id=c.get("case_id", "Unknown"),
-                        similarity_score=float(c.get("similarity", 0.0)),
-                        category=c.get("category", "Unknown"),
-                        location=c.get("location", "Unknown"),
-                        resolution_notes=c.get("resolution_notes", "Unknown")
+                        case_id=str(c.get("case_id", "Unknown")),
+                        similarity_score=max(0.0, min(1.0, float(c.get("similarity", 0.0)))),
+                        category=c.get("category", "Unknown") or "Unknown",
+                        location=c.get("location", "Unknown") or "Unknown",
+                        resolution_notes=c.get("resolution_notes", "No resolution available") or "No resolution available"
                     )
                 )
             except Exception:
-                continue  # skip bad records safely
+                continue
 
+        # If formatting fails completely
         if not similar_cases_formatted:
             if log_event:
                 log_event("formatting_issue", request_id, "All retrieved cases invalid")
 
             return {
-                "suggested_resolution": "Relevant cases found but could not be processed.",
+                "suggested_resolution": (
+                    "Relevant cases found but could not be processed.\n"
+                    "Recommended Action: Verify data integrity."
+                ),
                 "similar_cases": [],
                 "confidence_score": 0.0,
                 "explanation": "Retrieved data was not in expected format."
@@ -145,9 +157,12 @@ def analyze_case_pipeline(request, request_id, log_event=None):
 
         # ---------------- FINAL RESPONSE ----------------
         return {
-            "suggested_resolution": final_insight.get("suggested_resolution", "No suggestion available"),
+            "suggested_resolution": final_insight.get(
+                "suggested_resolution",
+                "No suggestion available"
+            ),
             "similar_cases": similar_cases_formatted,
-            "confidence_score": final_insight.get("confidence_score", 0.0),
+            "confidence_score": float(final_insight.get("confidence_score", 0.0)),
             "explanation": final_insight.get("explanation", explanation)
         }
 

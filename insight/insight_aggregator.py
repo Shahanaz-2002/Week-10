@@ -51,7 +51,10 @@ class InsightAggregator:
             log_event("no_matches", "No matches provided to aggregator")
 
             return {
-                "suggested_resolution": "No similar cases found. Unable to suggest a resolution.",
+                "suggested_resolution": (
+                    "No similar cases were found.\n"
+                    "Recommended Action: Please escalate this issue for manual review."
+                ),
                 "confidence_score": confidence_data.get("confidence_score", 0.0),
                 "explanation": explanation
             }
@@ -72,18 +75,15 @@ class InsightAggregator:
                 resolution = case.get("resolution_notes", "")
                 similarity = float(case.get("similarity", 0.0))
 
-                # Skip invalid similarity
                 if similarity <= 0:
                     continue
 
-                # Category aggregation
                 if isinstance(category, str) and category.strip():
                     category_clean = category.strip()
                     category_score[category_clean] = (
                         category_score.get(category_clean, 0.0) + similarity
                     )
 
-                # Resolution aggregation
                 if isinstance(resolution, str) and resolution.strip():
                     resolution_clean = resolution.strip()
                     resolution_score[resolution_clean] = (
@@ -108,12 +108,12 @@ class InsightAggregator:
         try:
             predicted_category = (
                 max(category_score, key=category_score.get)
-                if category_score else "Unknown category"
+                if category_score else "Unknown"
             )
 
             predicted_resolution = (
                 max(resolution_score, key=resolution_score.get)
-                if resolution_score else "No resolution pattern found"
+                if resolution_score else "No clear resolution pattern found"
             )
 
         except Exception as e:
@@ -121,18 +121,18 @@ class InsightAggregator:
                 "error": str(e)
             })
 
-            predicted_category = "Unknown category"
-            predicted_resolution = "No resolution pattern found"
+            predicted_category = "Unknown"
+            predicted_resolution = "No clear resolution pattern found"
 
         log_event("prediction_generated", "Final prediction created", {
             "category": predicted_category,
             "resolution": predicted_resolution
         })
 
-        # ---------------- FINAL RESOLUTION ----------------
+        # ---------------- IMPROVED USER-FRIENDLY OUTPUT ----------------
         suggested_resolution = (
-            f"Based on similar cases, the likely category is '{predicted_category}' "
-            f"and the recommended resolution is '{predicted_resolution}'."
+            f"Identified Category: {predicted_category}\n"
+            f"Recommended Action: {predicted_resolution}"
         )
 
         total_time = round((time.time() - start_time) * 1000, 2)
