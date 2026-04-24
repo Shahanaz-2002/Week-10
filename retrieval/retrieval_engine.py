@@ -3,14 +3,20 @@ import numpy as np
 import logging
 import json
 import time
+
 from retrieval.embedding import BioBERTEmbedding
 
 logger = logging.getLogger(__name__)
 
-embedder = BioBERTEmbedding()
+
+# ---------------- SAFE EMBEDDER INIT ----------------
+try:
+    embedder = BioBERTEmbedding()
+except Exception:
+    embedder = None
 
 
-# 🔹 STRUCTURED LOG HELPER
+# ---------------- LOG HELPER ----------------
 def log_event(event_type, message, extra=None):
     log_data = {
         "event": event_type,
@@ -23,7 +29,7 @@ def log_event(event_type, message, extra=None):
     logger.info(json.dumps(log_data))
 
 
-# 🔹 COSINE SIMILARITY
+# ---------------- COSINE SIMILARITY ----------------
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     try:
         norm_a = np.linalg.norm(a)
@@ -32,17 +38,14 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
         if norm_a == 0 or norm_b == 0:
             return 0.0
 
-        similarity = float(np.dot(a, b) / (norm_a * norm_b))
-
-        #  DO NOT CLAMP — keep true cosine similarity (-1 to 1)
-        return similarity
+        return float(np.dot(a, b) / (norm_a * norm_b))
 
     except Exception as e:
         log_event("cosine_error", "Error in cosine similarity", {"error": str(e)})
         return 0.0
 
 
-# 🔹 MAIN RETRIEVAL FUNCTION
+# ---------------- MAIN RETRIEVAL FUNCTION ----------------
 def retrieve_similar_cases(
     query_text: str,
     case_database: List[Dict],
@@ -57,20 +60,24 @@ def retrieve_similar_cases(
         "top_k": top_k
     })
 
-    # 🔹 INPUT VALIDATION
+    # ---------------- INPUT VALIDATION ----------------
     if not query_text or not isinstance(query_text, str) or not query_text.strip():
         log_event("validation_error", "Invalid query_text received")
-        raise ValueError("Query text must be a non-empty string")
+        return []
 
     if not isinstance(case_database, list):
         log_event("validation_error", "Invalid case database format")
-        raise ValueError("Case database must be a list")
+        return []
 
     if not isinstance(top_k, int) or top_k <= 0:
         log_event("top_k_warning", "Invalid top_k value, defaulting to 3")
         top_k = 3
 
-    # 🔹 EMBEDDING GENERATION
+    # ---------------- EMBEDDING ----------------
+    if embedder is None:
+        log_event("embedding_unavailable", "Embedder not initialized")
+        return []
+
     try:
         embed_start = time.time()
 
@@ -78,7 +85,7 @@ def retrieve_similar_cases(
 
         if query_embedding is None or len(query_embedding) == 0:
             log_event("embedding_failure", "Failed to generate query embedding")
-            raise ValueError("Embedding generation failed")
+            return []
 
         query_embedding = np.array(query_embedding)
 
@@ -91,12 +98,12 @@ def retrieve_similar_cases(
 
     except Exception as e:
         log_event("embedding_error", "Error generating embedding", {"error": str(e)})
-        raise ValueError("Error generating embedding")
+        return []
 
     results = []
     processed_cases = 0
 
-    # 🔹 SIMILARITY COMPUTATION
+    # ---------------- SIMILARITY COMPUTATION ----------------
     for case_data in case_database:
 
         if not isinstance(case_data, dict):
@@ -107,10 +114,8 @@ def retrieve_similar_cases(
             case_embedding = np.array(case_data.get("embedding", []))
 
             if case_embedding.size == 0:
-                log_event("empty_embedding", "Skipping case with empty embedding")
                 continue
 
-            #  Dimension check (VERY IMPORTANT)
             if len(query_embedding) != len(case_embedding):
                 log_event("dimension_mismatch", "Embedding dimension mismatch", {
                     "query_dim": len(query_embedding),
@@ -123,9 +128,9 @@ def retrieve_similar_cases(
             results.append({
                 "case_id": case_data.get("case_id", "Unknown"),
                 "similarity": similarity,
-                "diagnosis": case_data.get("diagnosis", "Unknown"),
-                "treatment": case_data.get("treatment", "Unknown"),
-                "symptoms": case_data.get("symptoms", []),
+                "category": case_data.get("category", "Unknown"),
+                "location": case_data.get("location", "Unknown"),
+                "resolution_notes": case_data.get("resolution_notes", "Unknown"),
                 "case_description": case_data.get("case_description", "")
             })
 
@@ -142,10 +147,9 @@ def retrieve_similar_cases(
         "total_results": len(results)
     })
 
-    # 🔹 SORTING & TOP-K
+    # ---------------- SORT & TOP-K ----------------
     try:
         results = sorted(results, key=lambda x: x["similarity"], reverse=True)
-
         top_results = results[:top_k]
 
         log_event("top_k_selected", "Top K cases selected", {
@@ -153,15 +157,6 @@ def retrieve_similar_cases(
             "top_case_ids": [r["case_id"] for r in top_results],
             "top_scores": [round(r["similarity"], 4) for r in top_results]
         })
-
-        #  DEBUG OUTPUT (REQUIRED FOR DAY 2 VALIDATION)
-        print("\n🔍 Query:", query_text)
-        print("Top Results:")
-        for r in top_results:
-            print(f"Case ID: {r['case_id']}")
-            print(f"Similarity: {round(r['similarity'], 4)}")
-            print(f"Description: {r['case_description']}")
-            print("-" * 50)
 
     except Exception as e:
         log_event("sorting_error", "Error during sorting", {"error": str(e)})

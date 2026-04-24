@@ -6,7 +6,7 @@ import time
 logger = logging.getLogger(__name__)
 
 
-# 🔹 LOG FUNCTION
+# ---------------- LOG FUNCTION ----------------
 def log_event(event_type, message, extra=None):
     log_data = {
         "event": event_type,
@@ -34,25 +34,33 @@ class InsightAggregator:
             "num_cases": len(top_matches) if isinstance(top_matches, list) else 0
         })
 
-        # 🔹 INPUT VALIDATION
+        # ---------------- SAFE INPUT HANDLING ----------------
         if not isinstance(top_matches, list):
-            log_event("validation_error", "top_matches is not a list")
-            raise ValueError("top_matches must be a list")
+            log_event("validation_warning", "top_matches is not a list, defaulting to empty")
+            top_matches = []
 
+        if not isinstance(confidence_data, dict):
+            log_event("validation_warning", "confidence_data invalid, defaulting")
+            confidence_data = {"confidence_score": 0.0}
+
+        if not explanation:
+            explanation = "No explanation available."
+
+        # ---------------- NO MATCH CASE ----------------
         if not top_matches:
             log_event("no_matches", "No matches provided to aggregator")
 
             return {
                 "suggested_resolution": "No similar cases found. Unable to suggest a resolution.",
                 "confidence_score": confidence_data.get("confidence_score", 0.0),
-                "explanation": explanation or "No explanation available."
+                "explanation": explanation
             }
 
         category_score = {}
         resolution_score = {}
         processed_cases = 0
 
-        # 🔹 PROCESS EACH CASE
+        # ---------------- PROCESS CASES ----------------
         for case in top_matches:
 
             if not isinstance(case, dict):
@@ -60,24 +68,23 @@ class InsightAggregator:
                 continue
 
             try:
-                category = case.get("category")
-                resolution = case.get("resolution_notes")
-
+                category = case.get("category", "")
+                resolution = case.get("resolution_notes", "")
                 similarity = float(case.get("similarity", 0.0))
 
-                # 🔹 Skip invalid similarity
+                # Skip invalid similarity
                 if similarity <= 0:
                     continue
 
-                # 🔹 Aggregate category
-                if category and isinstance(category, str) and category.strip():
+                # Category aggregation
+                if isinstance(category, str) and category.strip():
                     category_clean = category.strip()
                     category_score[category_clean] = (
                         category_score.get(category_clean, 0.0) + similarity
                     )
 
-                # 🔹 Aggregate resolution notes
-                if resolution and isinstance(resolution, str) and resolution.strip():
+                # Resolution aggregation
+                if isinstance(resolution, str) and resolution.strip():
                     resolution_clean = resolution.strip()
                     resolution_score[resolution_clean] = (
                         resolution_score.get(resolution_clean, 0.0) + similarity
@@ -97,23 +104,32 @@ class InsightAggregator:
             "unique_resolutions": len(resolution_score)
         })
 
-        # 🔹 FINAL PREDICTION
-        predicted_category = (
-            max(category_score, key=category_score.get)
-            if category_score else "Unknown category"
-        )
+        # ---------------- FINAL PREDICTION ----------------
+        try:
+            predicted_category = (
+                max(category_score, key=category_score.get)
+                if category_score else "Unknown category"
+            )
 
-        predicted_resolution = (
-            max(resolution_score, key=resolution_score.get)
-            if resolution_score else "No resolution pattern found"
-        )
+            predicted_resolution = (
+                max(resolution_score, key=resolution_score.get)
+                if resolution_score else "No resolution pattern found"
+            )
+
+        except Exception as e:
+            log_event("prediction_error", "Error during prediction", {
+                "error": str(e)
+            })
+
+            predicted_category = "Unknown category"
+            predicted_resolution = "No resolution pattern found"
 
         log_event("prediction_generated", "Final prediction created", {
             "category": predicted_category,
             "resolution": predicted_resolution
         })
 
-        # 🔹 FINAL RESOLUTION STRING
+        # ---------------- FINAL RESOLUTION ----------------
         suggested_resolution = (
             f"Based on similar cases, the likely category is '{predicted_category}' "
             f"and the recommended resolution is '{predicted_resolution}'."
@@ -125,9 +141,9 @@ class InsightAggregator:
             "execution_time_ms": total_time
         })
 
-        # 🔹 FINAL RESPONSE
+        # ---------------- FINAL RESPONSE ----------------
         return {
             "suggested_resolution": suggested_resolution,
             "confidence_score": confidence_data.get("confidence_score", 0.0),
-            "explanation": explanation or "No explanation available."
+            "explanation": explanation
         }
